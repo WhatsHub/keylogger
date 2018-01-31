@@ -1,56 +1,43 @@
 #include <stdlib.h>
-#include <string.h>
+#include <stdio.h>
 #include <unistd.h>
-#include <sys/select.h>
-#include <termios.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <linux/input.h>
 
-struct termios orig_termios;
+int main(int argc, char** argv){
 
-void reset_terminal_mode()
-{
-    tcsetattr(0, TCSANOW, &orig_termios);
-}
+    int fd, bytes;
+    struct input_event data;
 
-void set_conio_terminal_mode()
-{
-    struct termios new_termios;
+    const char *pDevice = "/dev/input/event1";
 
-    /* take two copies - one for now, one for later */
-    tcgetattr(0, &orig_termios);
-    memcpy(&new_termios, &orig_termios, sizeof(new_termios));
+    // Open Keyboard
+    fd = open(pDevice, O_RDONLY | O_NONBLOCK);
+    if(fd == -1){
 
-    /* register cleanup handler, and set the new terminal mode */
-    atexit(reset_terminal_mode);
-    cfmakeraw(&new_termios);
-    tcsetattr(0, TCSANOW, &new_termios);
-}
-
-int kbhit()
-{
-    struct timeval tv = { 0L, 0L };
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(0, &fds);
-    return select(1, &fds, NULL, NULL, &tv);
-}
-
-int getch()
-{
-    int r;
-    unsigned char c;
-    if ((r = read(0, &c, sizeof(c))) < 0) {
-        return r;
-    } else {
-        return c;
+        printf("ERROR Opening %s\n", pDevice);
+        return -1;
     }
-}
 
-int main(int argc, char *argv[])
-{
-    set_conio_terminal_mode();
-
-    while (!kbhit()) {
-        /* do some work */
+    while(1)
+    {
+        // Read Keyboard Data
+        bytes = read(fd, &data, sizeof(data));
+        if(bytes > 0)
+        {
+	    if(data.value == KEY_W){
+	    	printf(" DER W-KEY WURDE GEDRUECKT!!!\n ");
+	    }
+            printf("Keypress value=%x, type=%x, code=%x\n", data.value, data.type, data.code);
+        }
+        else
+        {
+            // Nothing read
+	    printf("Nothing to read\n");
+            sleep(1);
+        }
     }
-    (void)getch(); /* consume the character */
-}
+
+    return 0;
+ }
